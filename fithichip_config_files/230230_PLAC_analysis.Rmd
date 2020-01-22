@@ -1,0 +1,710 @@
+---
+title: "230230_PLAC_analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r read_in_data}
+setwd("/home/jonas/Documents/230238_PLAC_seq_analysis/")
+H3K4me3_merged_230238_int <- read.delim("interaction_files/230238_H3K4me3_MergeNearContacts.for_annot.bed.mm10.annotated_interactions/230238_H3K4me3_MergeNearContacts.for_annot.bed.mm10.annotated.txt",header = T, sep = "\t")
+
+colnames(H3K4me3_merged_230238_int)[1]<-"Peak1"
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r data_massaging_basic_int_file, echo=FALSE}
+
+#How many anchor-points have at least 1 ap close to TSS.
+H3K4me3_merged_230238_int$is_TSS1[abs(H3K4me3_merged_230238_int$Dist_TSS1) <= 2500 ] <-1
+H3K4me3_merged_230238_int$is_TSS2[abs(H3K4me3_merged_230238_int$Dist_TSS2) <= 2500 ] <-1
+1
+
+H3K4me3_merged_230238_int$is_TSS1[is.na(H3K4me3_merged_230238_int$is_TSS1) ] <-0
+H3K4me3_merged_230238_int$is_TSS2[is.na(H3K4me3_merged_230238_int$is_TSS2) ] <-0
+
+H3K4me3_merged_230238_int$is_TSS = H3K4me3_merged_230238_int$is_TSS1 + H3K4me3_merged_230238_int$is_TSS2
+
+(36643+8823)/(36643+8823+18722) #71% has a TSS in one or the other ap.
+
+#Remove the cases where there is on TSS per ap or TSS in both.
+
+H3K4me3_merged_230238_TSS_filt <- subset(H3K4me3_merged_230238_int, H3K4me3_merged_230238_int$is_TSS == 1)
+
+#How many genes have the ap1 and ap2 annotated to the same gene
+H3K4me3_merged_230238_TSS_filt$gene_1 <- as.character(H3K4me3_merged_230238_TSS_filt$gene_1)
+H3K4me3_merged_230238_TSS_filt$gene_2 <- as.character(H3K4me3_merged_230238_TSS_filt$gene_2)
+
+same_gene <- which(H3K4me3_merged_230238_TSS_filt$gene_1 == H3K4me3_merged_230238_TSS_filt$gene_2)
+#Only 4801 interactions have the same gene in both anchor point.
+
+H3K4me3_merged_230238_TSS_filt <- H3K4me3_merged_230238_TSS_filt[,-31]
+
+#Transfer the anchor point far from TSS to the one close to TSS ## Gene names ####
+#First side
+H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) + 1] <- H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1),27]
+
+H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) ] <- H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1),13]
+
+colnames(H3K4me3_merged_230238_TSS_filt)[max( ncol( H3K4me3_merged_230238_TSS_filt ) )] <- "gene1_new_ann"
+
+#Other side
+H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) + 1] <- H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1),13]
+
+H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) ] <- H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1),27]
+
+colnames(H3K4me3_merged_230238_TSS_filt)[max( ncol( H3K4me3_merged_230238_TSS_filt ) )] <- "gene2_new_ann"
+
+#Transfer the anchor point far from TSS to the one close to TSS ## Refseq names ####
+H3K4me3_merged_230238_TSS_filt[,11] <-as.character(H3K4me3_merged_230238_TSS_filt[,11])
+H3K4me3_merged_230238_TSS_filt[,25] <-as.character(H3K4me3_merged_230238_TSS_filt[,25])
+
+#First side
+H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) + 1] <- H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1),25]
+
+H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) ] <- H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1),11]
+
+colnames(H3K4me3_merged_230238_TSS_filt)[max( ncol( H3K4me3_merged_230238_TSS_filt ) )] <- "refseq1_new_ann"
+
+#Other side
+H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) + 1] <- H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1),11]
+
+H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) ] <- H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1),25]
+
+colnames(H3K4me3_merged_230238_TSS_filt)[max( ncol( H3K4me3_merged_230238_TSS_filt ) )] <- "refseq2_new_ann"
+
+
+#Transfer the anchor point far from TSS to the one close to TSS ## EntrezID ####
+
+#First side
+H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) + 1] <- H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1),23]
+
+H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) ] <- H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1),9]
+
+colnames(H3K4me3_merged_230238_TSS_filt)[max( ncol( H3K4me3_merged_230238_TSS_filt ) )] <- "EntrezID1_new_ann"
+
+#Other side
+H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) + 1] <- H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1),9]
+
+H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) ] <- H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1),23]
+
+colnames(H3K4me3_merged_230238_TSS_filt)[max( ncol( H3K4me3_merged_230238_TSS_filt ) )] <- "EntrezID2_new_ann"
+
+
+#Transfer the anchor point far from TSS to the one close to TSS ## Nearest promoter ####
+H3K4me3_merged_230238_TSS_filt[,8] <-as.character(H3K4me3_merged_230238_TSS_filt[,8])
+H3K4me3_merged_230238_TSS_filt[,22] <-as.character(H3K4me3_merged_230238_TSS_filt[,22])
+
+#First side
+H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) + 1] <- H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1),22]
+
+H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) ] <- H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1),8]
+
+colnames(H3K4me3_merged_230238_TSS_filt)[max( ncol( H3K4me3_merged_230238_TSS_filt ) )] <- "Nearest_prom1_new_ann"
+
+#Other side
+H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) + 1] <- H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1),8]
+
+H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) ] <- H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1),22]
+
+colnames(H3K4me3_merged_230238_TSS_filt)[max( ncol( H3K4me3_merged_230238_TSS_filt ) )] <- "Nearest_prom2_new_ann"
+
+
+#Transfer the anchor point far from TSS to the one close to TSS ## Ensemble ####
+H3K4me3_merged_230238_TSS_filt[,12] <-as.character(H3K4me3_merged_230238_TSS_filt[,12])
+H3K4me3_merged_230238_TSS_filt[,26] <-as.character(H3K4me3_merged_230238_TSS_filt[,26])
+
+#First side
+H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) + 1] <- H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1),26]
+
+H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) ] <- H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS2==1),12]
+
+colnames(H3K4me3_merged_230238_TSS_filt)[max( ncol( H3K4me3_merged_230238_TSS_filt ) )] <- "Ensembl1_new_ann"
+
+#Other side
+H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) + 1] <- H3K4me3_merged_230238_TSS_filt[which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1),12]
+
+H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( H3K4me3_merged_230238_TSS_filt ) ) ] <- H3K4me3_merged_230238_TSS_filt[-which(H3K4me3_merged_230238_TSS_filt$is_TSS1==1),26]
+
+colnames(H3K4me3_merged_230238_TSS_filt)[max( ncol( H3K4me3_merged_230238_TSS_filt ) )] <- "Ensembl2_new_ann"
+```
+```{r read_in_data_atac_overlap}
+setwd("/home/jonas/Documents/230238_PLAC_seq_analysis/")
+atac_H3K4me3_merged_230238_int <- read.delim("interaction_files/230238_H3K4me3_FitHiChIP.interactions_FitHiC_Q0.05_MergeNearContacts.for_peak_overlap.bed.atac.peak_overlap.mm10_annot.txt.mm10.annotated_interactions/230238_H3K4me3_FitHiChIP.interactions_FitHiC_Q0.05_MergeNearContacts.for_peak_overlap.bed.atac.peak_overlap.mm10_annot.txt.mm10.annotated.txt",header = T, sep = "\t")
+
+colnames(atac_H3K4me3_merged_230238_int)[1]<-"Peak1"
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r data_massaging_atac_overlap, echo=FALSE}
+
+#How many anchor-points have at least 1 ap close to TSS.
+atac_H3K4me3_merged_230238_int$is_TSS1[abs(atac_H3K4me3_merged_230238_int$Dist_TSS1) <= 2500 ] <-1
+atac_H3K4me3_merged_230238_int$is_TSS2[abs(atac_H3K4me3_merged_230238_int$Dist_TSS2) <= 2500 ] <-1
+1
+
+atac_H3K4me3_merged_230238_int$is_TSS1[is.na(atac_H3K4me3_merged_230238_int$is_TSS1) ] <-0
+atac_H3K4me3_merged_230238_int$is_TSS2[is.na(atac_H3K4me3_merged_230238_int$is_TSS2) ] <-0
+
+atac_H3K4me3_merged_230238_int$is_TSS = atac_H3K4me3_merged_230238_int$is_TSS1 + atac_H3K4me3_merged_230238_int$is_TSS2
+
+#Remove the cases where there is on TSS per ap or TSS in both.
+
+atac_H3K4me3_merged_230238_TSS_filt <- subset(atac_H3K4me3_merged_230238_int, atac_H3K4me3_merged_230238_int$is_TSS == 1)
+atac_H3K4me3_merged_230238_TSS_filt <- atac_H3K4me3_merged_230238_TSS_filt[,-34]
+
+#Transfer the anchor point far from TSS to the one close to TSS ## Gene names ####
+atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),27]
+
+atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) ] <- atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),13]
+
+colnames(atac_H3K4me3_merged_230238_TSS_filt)[max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) )] <- "gene1_new_ann"
+
+#Other side
+atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),13]
+
+atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) ] <- atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),27]
+
+colnames(atac_H3K4me3_merged_230238_TSS_filt)[max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) )] <- "gene2_new_ann"
+
+#Transfer the anchor point far from TSS to the one close to TSS ## Refseq names ####
+atac_H3K4me3_merged_230238_TSS_filt[,11] <-as.character(atac_H3K4me3_merged_230238_TSS_filt[,11])
+atac_H3K4me3_merged_230238_TSS_filt[,25] <-as.character(atac_H3K4me3_merged_230238_TSS_filt[,25])
+
+#First side
+atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),25]
+
+atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) ] <- atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),11]
+
+colnames(atac_H3K4me3_merged_230238_TSS_filt)[max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) )] <- "refseq1_new_ann"
+
+#Other side
+atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),11]
+
+atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) ] <- atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),25]
+
+colnames(atac_H3K4me3_merged_230238_TSS_filt)[max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) )] <- "refseq2_new_ann"
+
+
+#Transfer the anchor point far from TSS to the one close to TSS ## EntrezID ####
+
+#First side
+atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),23]
+
+atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) ] <- atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),9]
+
+colnames(atac_H3K4me3_merged_230238_TSS_filt)[max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) )] <- "EntrezID1_new_ann"
+
+#Other side
+atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),9]
+
+atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) ] <- atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),23]
+
+colnames(atac_H3K4me3_merged_230238_TSS_filt)[max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) )] <- "EntrezID2_new_ann"
+
+
+#Transfer the anchor point far from TSS to the one close to TSS ## Nearest promoter ####
+atac_H3K4me3_merged_230238_TSS_filt[,8] <-as.character(atac_H3K4me3_merged_230238_TSS_filt[,8])
+atac_H3K4me3_merged_230238_TSS_filt[,22] <-as.character(atac_H3K4me3_merged_230238_TSS_filt[,22])
+
+#First side
+atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),22]
+
+atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) ] <- atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),8]
+
+colnames(atac_H3K4me3_merged_230238_TSS_filt)[max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) )] <- "Nearest_prom1_new_ann"
+
+#Other side
+atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),8]
+
+atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) ] <- atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),22]
+
+colnames(atac_H3K4me3_merged_230238_TSS_filt)[max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) )] <- "Nearest_prom2_new_ann"
+
+
+#Transfer the anchor point far from TSS to the one close to TSS ## Ensemble ####
+atac_H3K4me3_merged_230238_TSS_filt[,12] <-as.character(atac_H3K4me3_merged_230238_TSS_filt[,12])
+atac_H3K4me3_merged_230238_TSS_filt[,26] <-as.character(atac_H3K4me3_merged_230238_TSS_filt[,26])
+
+#First side
+atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),26]
+
+atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) ] <- atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),12]
+
+colnames(atac_H3K4me3_merged_230238_TSS_filt)[max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) )] <- "Ensembl1_new_ann"
+
+#Other side
+atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- atac_H3K4me3_merged_230238_TSS_filt[which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),12]
+
+atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) ) ] <- atac_H3K4me3_merged_230238_TSS_filt[-which(atac_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),26]
+
+colnames(atac_H3K4me3_merged_230238_TSS_filt)[max( ncol( atac_H3K4me3_merged_230238_TSS_filt ) )] <- "Ensembl2_new_ann"
+```
+
+```{r read_in_data_Ebf1_chip_overlap}
+Ebf1_H3K4me3_merged_230238_int <- read.delim("interaction_files/230238_H3K4me3_FitHiChIP.interactions_FitHiC_Q0.05_MergeNearContacts.for_peak_overlap.bed.Ebf1.peak_overlap.for_annot.txt.mm10.annotated_interactions/230238_H3K4me3_FitHiChIP.interactions_FitHiC_Q0.05_MergeNearContacts.for_peak_overlap.bed.Ebf1.peak_overlap.for_annot.txt.mm10.annotated.txt",header = T, sep = "\t")
+
+colnames(Ebf1_H3K4me3_merged_230238_int)[1]<-"Peak1"
+
+
+```
+
+```{r data_massaging_Ebf1_dist_reann_overlap, echo=FALSE}
+
+Ebf1_dist_reann_H3K4me3_merged_230238_int<- Ebf1_H3K4me3_merged_230238_int[,c(1:28)]
+
+#How many anchor-points have at least 1 ap close to TSS.
+Ebf1_dist_reann_H3K4me3_merged_230238_int$is_TSS1[abs(Ebf1_dist_reann_H3K4me3_merged_230238_int$Dist_TSS1) <= 2500 ] <-1
+Ebf1_dist_reann_H3K4me3_merged_230238_int$is_TSS2[abs(Ebf1_dist_reann_H3K4me3_merged_230238_int$Dist_TSS2) <= 2500 ] <-1
+
+Ebf1_dist_reann_H3K4me3_merged_230238_int$is_TSS1[is.na(Ebf1_dist_reann_H3K4me3_merged_230238_int$is_TSS1) ] <-0
+Ebf1_dist_reann_H3K4me3_merged_230238_int$is_TSS2[is.na(Ebf1_dist_reann_H3K4me3_merged_230238_int$is_TSS2) ] <-0
+
+Ebf1_dist_reann_H3K4me3_merged_230238_int$is_TSS = Ebf1_dist_reann_H3K4me3_merged_230238_int$is_TSS1 + Ebf1_dist_reann_H3K4me3_merged_230238_int$is_TSS2
+
+#Remove the cases where there is on TSS per ap or TSS in both.
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt <- subset(Ebf1_dist_reann_H3K4me3_merged_230238_int, Ebf1_dist_reann_H3K4me3_merged_230238_int$is_TSS == 1)
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,-31]
+
+#Transfer the anchor point far from TSS to the one close to TSS ## Gene names ####
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),27]
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) ] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),13]
+
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) )] <- "gene1_new_ann"
+
+#Other side
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),13]
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) ] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),27]
+
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) )] <- "gene2_new_ann"
+
+#Transfer the anchor point far from TSS to the one close to TSS ## Refseq names ####
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,11] <-as.character(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,11])
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,25] <-as.character(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,25])
+
+#First side
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),25]
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) ] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),11]
+
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) )] <- "refseq1_new_ann"
+
+#Other side
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),11]
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) ] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),25]
+
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) )] <- "refseq2_new_ann"
+
+
+#Transfer the anchor point far from TSS to the one close to TSS ## EntrezID ####
+
+#First side
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),23]
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) ] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),9]
+
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) )] <- "EntrezID1_new_ann"
+
+#Other side
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),9]
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) ] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),23]
+
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) )] <- "EntrezID2_new_ann"
+
+
+#Transfer the anchor point far from TSS to the one close to TSS ## Nearest promoter ####
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,8] <-as.character(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,8])
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,22] <-as.character(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,22])
+
+#First side
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),22]
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) ] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),8]
+
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) )] <- "Nearest_prom1_new_ann"
+
+#Other side
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),8]
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) ] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),22]
+
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) )] <- "Nearest_prom2_new_ann"
+
+
+#Transfer the anchor point far from TSS to the one close to TSS ## Ensemble ####
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,12] <-as.character(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,12])
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,26] <-as.character(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,26])
+
+#First side
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),26]
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) ] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS2==1),12]
+
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) )] <- "Ensembl1_new_ann"
+
+#Other side
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) + 1] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),12]
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1), max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) ) ] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[-which(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$is_TSS1==1),26]
+
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[max( ncol( Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt ) )] <- "Ensembl2_new_ann"
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,31] <-as.character(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,31])
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,32] <-as.character(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[,32])
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(is.na(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$gene1_new_ann)), 31] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(is.na(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$gene1_new_ann)),32]
+
+Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(is.na(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$gene2_new_ann)), 32] <- Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt[which(is.na(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt$gene2_new_ann)),31]
+
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[34] <-"refseq2_new_ann"
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[35] <-"EntrezID1_new_ann"
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[36] <-"EntrezID2_new_ann"
+colnames(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt)[37] <-"Nearest_prom1_new_ann"
+
+write.table(Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt, "Ebf1_dist_reann_H3K4me3_merged_230238_TSS_filt.txt", sep = "\t", row.names = F, quote = F)
+
+```
+
+```{r circos_plot}
+#Create a circos plot over Ebf1 bound and unbound 230238 interactions.
+#create a unique ID for the Ebf1 overlapping file and for the H3K4me3 merged file
+
+Ebf1_H3K4me3_merged_230238_int$loop1_id <-paste(Ebf1_H3K4me3_merged_230238_int$chr_1,Ebf1_H3K4me3_merged_230238_int$s1,sep = ":")
+Ebf1_H3K4me3_merged_230238_int$loop_id <-paste(Ebf1_H3K4me3_merged_230238_int$loop1_id,Ebf1_H3K4me3_merged_230238_int$e2,sep = "-")
+Ebf1_H3K4me3_merged_230238_int <- Ebf1_H3K4me3_merged_230238_int[,-32]
+
+H3K4me3_merged_230238_int$loop1_id <-paste(H3K4me3_merged_230238_int$chr_1,H3K4me3_merged_230238_int$s1,sep = ":")
+H3K4me3_merged_230238_int$loop_id <-paste(H3K4me3_merged_230238_int$loop1_id,H3K4me3_merged_230238_int$e2,sep = "-")
+H3K4me3_merged_230238_int <- H3K4me3_merged_230238_int[,-29]
+
+which_Ebf1 <- Ebf1_H3K4me3_merged_230238_int[,c(32,30,31)]
+colnames(which_Ebf1)[2:3]<-c("isEbf1_left_anchor","isEbf1_right_anchor")
+
+H3K4me3_merged_230238_int <- merge(H3K4me3_merged_230238_int,which_Ebf1, by = "loop_id", all.x = T)
+H3K4me3_merged_230238_int[,c(30,31)][is.na(H3K4me3_merged_230238_int[,c(30,31)])] <- 0
+
+source("/home/jonas/R_scripts/match_list_function.R")
+
+H3K4me3_merged_230238_int <- match_lists(H3K4me3_merged_230238_int,H3K4me3_merged_230238_int$loop_id, Ebf1_H3K4me3_merged_230238_int$loop_id,match_number = "Ebf1", name_match_column = "Ebf1_binding")
+H3K4me3_merged_230238_int$Ebf1_binding[H3K4me3_merged_230238_int$Ebf1_binding == "FALSE"] <- "No_Ebf1"
+
+
+# Mark which side is TSS
+
+H3K4me3_merged_230238_int$left_ap_TSS[abs(H3K4me3_merged_230238_int$Dist_TSS1) <= 2500] <- "TSS"
+H3K4me3_merged_230238_int$right_ap_TSS[abs(H3K4me3_merged_230238_int$Dist_TSS2) <= 2500] <- "TSS"
+#Replace na with 0
+H3K4me3_merged_230238_int[,c(32,33)][is.na(H3K4me3_merged_230238_int[,c(32,33)])] <- 0
+#Transfer it to something fairly easy to work with.
+a <- H3K4me3_merged_230238_int
+a <- a[,-c(32:33)]
+a$left_ap_TSS[abs(a$Dist_TSS1) <= 2500] <- 1
+a$right_ap_TSS[abs(a$Dist_TSS2) <= 2500] <- 1
+#Replace na with 0
+a[,c(32,33)][is.na(a[,c(32,33)])] <- 0
+#Make some upset plots:
+upset_H3K4me3 <- a[,c(2,30:33)]
+upset_H3K4me3[,c(2:5)][upset_H3K4me3[,c(2:5)] >= 1] <- 1
+
+
+colnames(upset_H3K4me3) <- c("PeakID","Ebf1_l","Ebf1_r","left_ap_TSS","right_ap_TSS")
+library(UpSetR)
+upset(upset_H3K4me3,  sets = c("Ebf1_l","Ebf1_r","left_ap_TSS","right_ap_TSS") ,order.by = "freq", mb.ratio = c(0.7, 0.3), number.angles = 25,nintersects = NA)
+
+
+#Create two factorials describing the combination of factors in either anchor-point.
+
+#a$PU1_TF_left[a$PU1_TF_left > 0] <- 1
+#a$PU1_TF_right[a$PU1_TF_right> 0] <- 1
+#a$Runx1_TF_left[a$Runx1_TF_left > 0] <- 10
+#a$Runx1_TF_right[a$Runx1_TF_right > 0] <- 10
+
+
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_left_ap <- a$PU1_TF_left + a$Runx1_TF_left 
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap <- a$PU1_TF_right + a$Runx1_TF_right
+
+H3K4me3_merged_230238_int$isEbf1_left_anchor[H3K4me3_merged_230238_int$isEbf1_left_anchor == 1] <- "Ebf1"
+
+H3K4me3_merged_230238_int$isEbf1_right_anchor[H3K4me3_merged_230238_int$isEbf1_right_anchor == 1] <- "Ebf1"
+
+
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_left_ap[H3K4me3_Pu1_Runx1_merged_annotated$TFs_left_ap == 10] <- "Runx1"
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_left_ap[H3K4me3_Pu1_Runx1_merged_annotated$TFs_left_ap == 11] <- "Pu1.Runx1"
+
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap[H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap == 1] <- "Pu1"
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap[H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap == 10] <- "Runx1"
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap[H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap == 11] <- "Pu1.Runx1"
+
+#Create a sorted combination of TF_TSS combination in either ap.
+H3K4me3_merged_230238_int$left_combo <- paste(H3K4me3_merged_230238_int$isEbf1_left_anchor,H3K4me3_merged_230238_int$left_ap_TSS, sep = ".")
+H3K4me3_merged_230238_int$right_combo <- paste(H3K4me3_merged_230238_int$isEbf1_right_anchor,H3K4me3_merged_230238_int$right_ap_TSS, sep = ".")
+
+H3K4me3_merged_230238_int$TF_combo <- paste(H3K4me3_merged_230238_int$left_combo,H3K4me3_merged_230238_int$right_combo, sep = "_")
+
+
+#Filter out so only one end is a TSS but have to be a TSS.
+#H3K4me3_Pu1_Runx1_merged_annotated_TSS_filtered <- subset(H3K4me3_Pu1_Runx1_merged_annotated, abs(H3K4me3_Pu1_Runx1_merged_annotated$Dist_TSS1) <= 2500 | abs(H3K4me3_Pu1_Runx1_merged_annotated$Dist_TSS2) <= 2500) 
+ 
+
+#double_TSS <- which( H3K4me3_Pu1_Runx1_merged_annotated_TSS_filtered$left_ap_TSS == "TSS" & H3K4me3_Pu1_Runx1_merged_annotated_TSS_filtered$right_ap_TSS == "TSS" )
+
+#H3K4me3_Pu1_Runx1_merged_annotated_TSS_one_side <- H3K4me3_Pu1_Runx1_merged_annotated_TSS_filtered[-double_TSS,]
+
+#The snippet of code below elimnate the ap left-right directionality 
+a <- H3K4me3_merged_230238_int[,c(2,30:36)]
+
+
+library(stringr)
+s = str_split( a$TF_combo, '_')
+test <- lapply(s, sort)
+
+
+test2 <- as.data.frame(NA)
+#Make a loop that goes throught the list and paste element 1 and 2 row-wise.
+for (i in 1:length(test)) {
+  test2[[i]] <- paste( test[[i]][1], test[[i]][2], sep ="_")
+}
+test2 <- as.data.frame (t(test2))
+H3K4me3_merged_230238_int$TF_category <- test2$V1
+a <- H3K4me3_merged_230238_int
+
+
+for_sankey <- a[,c(2,41)]
+for_sankey <- cbind(for_sankey, as.data.frame( t( as.data.frame  (sapply(for_sankey$TF_category, str_split, pattern ="_")  ) ) ) )
+rownames(for_sankey) <- NULL
+
+#Move the TSS so it is on the right side unless it exists in both.
+for_sankey$TSS_left <- str_count(for_sankey$V1, "TSS")
+for_sankey$TSS_right <- str_count(for_sankey$V2, "TSS")
+
+swap <- which( for_sankey[,'TSS_left'] == 1  & for_sankey[,'TSS_right'] == 0)
+
+swapper <- function(id) { x = as.character(for_sankey[id,'TF_category']) 
+          s = str_split( x, '_') 
+          paste( s[[1]][2], s[[1]][1], sep ="_" ) 
+          }
+
+test <-   as.data.frame (  unlist( (lapply( swap , swapper) ) ) ) 
+test[,1] <-as.character(test[,1])
+for_sankey$new <- ""
+for_sankey[swap,7] <- test[,1]
+for_sankey[,2] <- as.character(for_sankey[,2])
+for_sankey[-swap,7] <- for_sankey[-swap,2]
+
+for_sankey <- cbind(for_sankey, as.data.frame( t( as.data.frame  (sapply(for_sankey$new, str_split, pattern ="_")  ) ) ) )
+rownames(for_sankey) <- NULL
+
+for_sankey <- for_sankey[,-c(3:4)]
+
+for_sankey$V1 <-as.character(for_sankey$V1)
+for_sankey$V2 <-as.character(for_sankey$V2)
+
+
+# no binding no TSS
+test <- subset(for_sankey,for_sankey$V1 == "0.0") 
+match_str <- c("Runx1")
+d <- subset(test, grepl(paste(match_str, collapse= "|"), test$V2))
+table(d$V2)
+
+# Ebf1 binding no TSS
+test <- subset(for_sankey,for_sankey$V1 == "1.0") 
+table(test$V2)
+
+# no binding TSS
+test <- subset(for_sankey,for_sankey$V1 == "0.TSS") 
+table(test$V2)
+
+# Ebf1 binding TSS
+test <- subset(for_sankey,for_sankey$V1 == "1.TSS") 
+table(test$V2)
+
+#From: (FROM test)            To (FROM d)
+#
+#None             None      11122
+#None             None.TSS  18237
+#None             Ebf1      7344
+#None             Ebf1.TSS  15385
+
+#Eb1              None.TSS  3276
+#Ebf1             Ebf1      1423
+#Ebf1             Ebf1.TSS  3281
+
+#None.TSS         None.TSS  3284
+#None.TSS         Ebf1.TSS  4657
+
+#Ebf1.TSS         Ebf1.TSS  1889
+
+
+
+
+for_coord_H3K4me3 <- read.delim("230238_PLAC_Ebf1_int_for_coord.csv", stringsAsFactors = F)
+for_coord_H3K4me3 <- for_coord_H3K4me3[,c(1:3)]
+grid.col <- c('#e6194b', '#3cb44b', '#f58231', '#4363d8')
+
+grid.col <- c('#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000')
+install.packages("circlize")
+library(circlize)
+chordDiagram(for_coord_H3K4me3[,c(2,1,3)], grid.col = grid.col, big.gap = 50)
+chordDiagram(for_coord_H3K4me3[,c(1,2,3)],  big.gap = 50)
+
+
+
+```
+```{r circos_plot_atac}
+#Create a circos plot over Ebf1 bound and unbound 230238 interactions.
+#create a unique ID for the Ebf1 overlapping file and for the H3K4me3 merged file
+
+atac_H3K4me3_merged_230238_int$loop1_id <-paste(atac_H3K4me3_merged_230238_int$chr_1,atac_H3K4me3_merged_230238_int$s1,sep = ":")
+atac_H3K4me3_merged_230238_int$loop_id <-paste(atac_H3K4me3_merged_230238_int$loop1_id, atac_H3K4me3_merged_230238_int$e2,sep = "-")
+atac_H3K4me3_merged_230238_int <- atac_H3K4me3_merged_230238_int[,-31]
+
+H3K4me3_merged_230238_int_atac <- H3K4me3_merged_230238_int[,1:29]
+
+which_atac <- atac_H3K4me3_merged_230238_int[,c(31,29,30)]
+
+H3K4me3_merged_230238_int_atac <- merge(H3K4me3_merged_230238_int_atac,which_atac, by = "loop_id", all.x = T)
+H3K4me3_merged_230238_int_atac[,c(30,31)][is.na(H3K4me3_merged_230238_int_atac[,c(30,31)])] <- 0
+
+
+# Mark which side is TSS
+
+H3K4me3_merged_230238_int_atac$left_ap_TSS[abs(H3K4me3_merged_230238_int_atac$Dist_TSS1) <= 2500] <- "TSS"
+H3K4me3_merged_230238_int_atac$right_ap_TSS[abs(H3K4me3_merged_230238_int_atac$Dist_TSS2) <= 2500] <- "TSS"
+#Replace na with 0
+H3K4me3_merged_230238_int_atac[,c(32,33)][is.na(H3K4me3_merged_230238_int_atac[,c(32,33)])] <- 0
+#Transfer it to something fairly easy to work with.
+a <- H3K4me3_merged_230238_int_atac
+a <- a[,-c(32:33)]
+a$left_ap_TSS[abs(a$Dist_TSS1) <= 2500] <- 1
+a$right_ap_TSS[abs(a$Dist_TSS2) <= 2500] <- 1
+#Replace na with 0
+a[,c(32,33)][is.na(a[,c(32,33)])] <- 0
+#Make some upset plots:
+upset_H3K4me3 <- a[,c(2,30:33)]
+upset_H3K4me3[,c(2:5)][upset_H3K4me3[,c(2:5)] >= 1] <- 1
+
+
+colnames(upset_H3K4me3) <- c("PeakID","atac_l","atac_r","left_ap_TSS","right_ap_TSS")
+library(UpSetR)
+upset(upset_H3K4me3,  sets = c("atac_l","atac_r","left_ap_TSS","right_ap_TSS") ,order.by = "freq", mb.ratio = c(0.7, 0.3), number.angles = 25,nintersects = NA)
+
+
+#Create two factorials describing the combination of factors in either anchor-point.
+
+#a$PU1_TF_left[a$PU1_TF_left > 0] <- 1
+#a$PU1_TF_right[a$PU1_TF_right> 0] <- 1
+#a$Runx1_TF_left[a$Runx1_TF_left > 0] <- 10
+#a$Runx1_TF_right[a$Runx1_TF_right > 0] <- 10
+
+
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_left_ap <- a$PU1_TF_left + a$Runx1_TF_left 
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap <- a$PU1_TF_right + a$Runx1_TF_right
+
+H3K4me3_merged_230238_int_atac$isATAC_left_anchor[H3K4me3_merged_230238_int_atac$isATAC_left_anchor == 1] <- "atac"
+
+H3K4me3_merged_230238_int_atac$isATAC_right_anchor[H3K4me3_merged_230238_int_atac$isATAC_right_anchor == 1] <- "atac"
+
+
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_left_ap[H3K4me3_Pu1_Runx1_merged_annotated$TFs_left_ap == 10] <- "Runx1"
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_left_ap[H3K4me3_Pu1_Runx1_merged_annotated$TFs_left_ap == 11] <- "Pu1.Runx1"
+
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap[H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap == 1] <- "Pu1"
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap[H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap == 10] <- "Runx1"
+#H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap[H3K4me3_Pu1_Runx1_merged_annotated$TFs_right_ap == 11] <- "Pu1.Runx1"
+
+#Create a sorted combination of TF_TSS combination in either ap.
+H3K4me3_merged_230238_int_atac$left_combo <- paste(H3K4me3_merged_230238_int_atac$isATAC_left_anchor,H3K4me3_merged_230238_int_atac$left_ap_TSS, sep = ".")
+H3K4me3_merged_230238_int_atac$right_combo <- paste(H3K4me3_merged_230238_int_atac$isATAC_right_anchor,H3K4me3_merged_230238_int_atac$right_ap_TSS, sep = ".")
+
+H3K4me3_merged_230238_int_atac$TF_combo <- paste(H3K4me3_merged_230238_int_atac$left_combo,H3K4me3_merged_230238_int_atac$right_combo, sep = "_")
+
+
+#Filter out so only one end is a TSS but have to be a TSS.
+#H3K4me3_Pu1_Runx1_merged_annotated_TSS_filtered <- subset(H3K4me3_Pu1_Runx1_merged_annotated, abs(H3K4me3_Pu1_Runx1_merged_annotated$Dist_TSS1) <= 2500 | abs(H3K4me3_Pu1_Runx1_merged_annotated$Dist_TSS2) <= 2500) 
+ 
+
+#double_TSS <- which( H3K4me3_Pu1_Runx1_merged_annotated_TSS_filtered$left_ap_TSS == "TSS" & H3K4me3_Pu1_Runx1_merged_annotated_TSS_filtered$right_ap_TSS == "TSS" )
+
+#H3K4me3_Pu1_Runx1_merged_annotated_TSS_one_side <- H3K4me3_Pu1_Runx1_merged_annotated_TSS_filtered[-double_TSS,]
+
+#The snippet of code below elimnate the ap left-right directionality 
+a <- H3K4me3_merged_230238_int_atac[,c(2,30:36)]
+
+
+library(stringr)
+s = str_split( a$TF_combo, '_')
+test <- lapply(s, sort)
+
+
+test2 <- as.data.frame(NA)
+#Make a loop that goes throught the list and paste element 1 and 2 row-wise.
+for (i in 1:length(test)) {
+  test2[[i]] <- paste( test[[i]][1], test[[i]][2], sep ="_")
+}
+test2 <- as.data.frame (t(test2))
+H3K4me3_merged_230238_int_atac$TF_category <- test2$V1
+
+table(H3K4me3_merged_230238_int_atac$TF_category)
+
+#From: (FROM test)            To (FROM d)
+#
+#None             None      2993
+#None             None.TSS  682
+#None             atac      9682
+#None             atac.TSS  20856
+
+#atac              None.TSS  549
+#atac             atac      7214
+#atac             atac.TSS  18092
+
+#None.TSS         None.TSS  82
+#None.TSS         atac.TSS  1131
+
+#atac.TSS         atac.TSS  8617
+
+
+
+
+for_coord_H3K4me3 <- read.delim("230238_PLAC_atac_int_for_coord.csv", stringsAsFactors = F)
+for_coord_H3K4me3 <- for_coord_H3K4me3[,c(1:3)]
+grid.col <- c('#e6194b', '#3cb44b', '#f58231', '#4363d8')
+
+grid.col <- c('#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000')
+install.packages("circlize")
+library(circlize)
+chordDiagram(for_coord_H3K4me3[,c(1,2,3)], grid.col = grid.col, big.gap = 50)
+chordDiagram(for_coord_H3K4me3[,c(1,2,3)],  big.gap = 50)
+
+
+
+```
+
+
+```{r export_the_data}
+
+write.table(x = atac_H3K4me3_merged_230238_TSS_filt, "/home/jonas/Documents/230238_PLAC_seq_analysis/interaction_files/230238_H3K4me3_FitHiChIP.interactions_FitHiC_Q0.05_MergeNearContacts.for_peak_overlap.bed.atac.peak_overlap.mm10_annot.txt.mm10.annotated_interactions/H3K4me3_merged_230238.atac_overlapping.interaction_TSS_annotated.txt", sep = "\t", row.names = F)
+```
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

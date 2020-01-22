@@ -1,0 +1,516 @@
+---
+title: "HiC-matrix_for_virt4c_norm"
+author: "Jonas Ungerbäck"
+date: "11/1/2019"
+output: html_document
+---
+
+The purpose of this code it to read in and process FLWT and FLEKO 5000 bp binned iced normalized data. The data will be merged, filtered for intrachromosmal reads with contact less than 3Mb (same as in the FitHiChIP analysis). I have done this but the idea is to clean up the code so it more easily can be applied to other comparisons. The data should be exported so it can be to to a dense matrix with HiC-Pro and then to a BUTLR object for virtual4c. Additionally, it should be exported so it can be overlapped with binding sites or other features in the bed-format.
+
+```{r set_dependencies_read_data, include=FALSE}
+library(stringr)
+library(preprocessCore)
+
+#Use the HiC-matrix data to normalize
+#Read in iced normalized and raw data.
+FLWT_5000_iced <- read.delim("/mnt/data/common/jonas/placseq/191009_21_174_175_H3K4me3_PLAC_FLWT_hicpro/hic_results/matrix/21_174_175_fastq_trimmed/iced/5000/21_174_175_fastq_trimmed_5000_iced.matrix", stringsAsFactors = F, header = F)
+FLEKO_5000_iced <- read.delim("/mnt/data/common/jonas/placseq/191009_13_16_176_177_H3K4me3_PLAC_FLEKO_hicpro/hic_results/matrix/13_16_176_177_fastq_trimmed/iced/5000/13_16_176_177_fastq_trimmed_5000_iced.matrix", stringsAsFactors = F, header = F)
+
+#Read in the the genomic coordinate translation file
+gc_trans_key <- read.delim("/mnt/data/common/jonas/placseq/191009_21_174_175_H3K4me3_PLAC_FLWT_hicpro/hic_results/matrix/21_174_175_fastq_trimmed/raw/5000/21_174_175_fastq_trimmed_5000_abs.bed", stringsAsFactors = F, header = F)
+colnames(gc_trans_key)<-c("chr","start","end","bin_nr")
+#Generate a coordinate translation key.
+gc_trans_key$bin_key <- paste(gc_trans_key$chr, gc_trans_key$start, gc_trans_key$end, sep = "_")
+
+#Plot the densities to see that the lines do not overlap.
+plot(density(FLEKO_5000_iced$V3), xlim=c(0,20))
+lines(density(FLWT_5000_iced$V3), col=c("red"))
+```
+
+
+```{r quantile_normalization}
+
+#I will try to manually normalize the WT interaction count data from the iced norm matrix
+FL_WT_iced_for_norm <- FLWT_5000_iced
+FL_EKO_iced_for_norm <- FLEKO_5000_iced
+
+#Create a bin key
+FL_WT_iced_for_norm$bin_key <- paste(FL_WT_iced_for_norm$V1, FL_WT_iced_for_norm$V2, sep = "_")
+FL_EKO_iced_for_norm$bin_key <- paste(FL_EKO_iced_for_norm$V1, FL_EKO_iced_for_norm$V2, sep = "_")
+
+#Replcae the code with coordinates and filter out interactions that are on different chromosomes and inreactions > 3Mb,
+FL_WT_iced_for_norm$V1<- gc_trans_key$bin_key[match(FL_WT_iced_for_norm$V1, gc_trans_key$bin_nr)]
+FL_WT_iced_for_norm$V2<- gc_trans_key$bin_key[match(FL_WT_iced_for_norm$V2, gc_trans_key$bin_nr)]
+
+FL_EKO_iced_for_norm$V1<- gc_trans_key$bin_key[match(FL_EKO_iced_for_norm$V1, gc_trans_key$bin_nr)]
+FL_EKO_iced_for_norm$V2<- gc_trans_key$bin_key[match(FL_EKO_iced_for_norm$V2, gc_trans_key$bin_nr)]
+
+
+library(stringr)
+
+x1 <- str_split_fixed(FL_WT_iced_for_norm$V1, "_",3)
+colnames(x1) <- c("chr_1","start_1","end_1")
+FL_WT_iced_for_norm <- cbind(x1,FL_WT_iced_for_norm[,-1])
+
+x2 <- str_split_fixed(FL_WT_iced_for_norm$V2, "_",3)
+colnames(x2) <- c("chr_2","start_2","end_2")
+FL_WT_iced_for_norm <- cbind(FL_WT_iced_for_norm[,c(1:3)], x2, FL_WT_iced_for_norm[,c(5:6)])
+
+
+y1 <- str_split_fixed(FL_EKO_iced_for_norm$V1, "_",3)
+colnames(y1) <- c("chr_1","start_1","end_1")
+FL_EKO_iced_for_norm <- cbind(y1,FL_EKO_iced_for_norm[,-1])
+
+y2 <- str_split_fixed(FL_EKO_iced_for_norm$V2, "_",3)
+colnames(y2) <- c("chr_2","start_2","end_2")
+FL_EKO_iced_for_norm <- cbind(FL_EKO_iced_for_norm[,c(1:3)], y2, FL_EKO_iced_for_norm[,c(5:6)])
+
+#Filter out inter-chromosomal interactions and reads further away than 30Mb.
+FL_WT_iced_for_norm <- FL_WT_iced_for_norm[which(FL_WT_iced_for_norm$chr_1 == FL_WT_iced_for_norm$chr_2), ]
+FL_EKO_iced_for_norm <- FL_EKO_iced_for_norm[which(FL_EKO_iced_for_norm$chr_1 == FL_EKO_iced_for_norm$chr_2), ]
+
+#At this point my start and end coordinates are factors
+FL_WT_iced_for_norm [,c(2)] <- as.numeric(as.character( FL_WT_iced_for_norm [,c(2)]))
+FL_WT_iced_for_norm [,c(3)] <- as.numeric(as.character( FL_WT_iced_for_norm [,c(3)]))
+FL_WT_iced_for_norm [,c(5)] <- as.numeric(as.character( FL_WT_iced_for_norm [,c(5)]))
+FL_WT_iced_for_norm [,c(6)] <- as.numeric(as.character( FL_WT_iced_for_norm [,c(6)]))
+FL_EKO_iced_for_norm[,c(2)] <- as.numeric(as.character( FL_EKO_iced_for_norm[,c(2)]))
+FL_EKO_iced_for_norm[,c(3)] <- as.numeric(as.character( FL_EKO_iced_for_norm[,c(3)]))
+FL_EKO_iced_for_norm[,c(5)] <- as.numeric(as.character( FL_EKO_iced_for_norm[,c(5)]))
+FL_EKO_iced_for_norm[,c(6)] <- as.numeric(as.character( FL_EKO_iced_for_norm[,c(6)]))
+
+#Filter against very long-range interactions (more than 3Mb)
+FL_WT_iced_for_norm <- FL_WT_iced_for_norm[which((FL_WT_iced_for_norm$end_2 - FL_WT_iced_for_norm$start_1) <= 3000000), ]
+FL_EKO_iced_for_norm <- FL_EKO_iced_for_norm[which((FL_EKO_iced_for_norm$end_2 - FL_EKO_iced_for_norm$start_1) <= 3000000), ]
+
+#Create a merged WT and EKO df that will be used for normalization.
+WT_EKO_iced_for_norm <- merge(FL_WT_iced_for_norm, FL_EKO_iced_for_norm, by = "bin_key", all = T)
+colnames(WT_EKO_iced_for_norm) <- c("bin_key","chr_1_WT","start_1_WT","end_1_WT","chr_2_WT","start_2_WT","end_2_WT","WT_ice_score","chr_1_EKO","start_1_EKO","end_1_EKO","chr_2_EKO","start_2_EKO","end_2_EKO","EKO_ice_score") 
+
+#Here everything where there is no match will be NA on both left and right side. Replace the missing coordinates their mates on the sides with where they exist and missing WT and EKO_ice_Score with 0.
+
+WT_EKO_iced_for_norm$chr_1_WT[is.na(WT_EKO_iced_for_norm$chr_1_WT)] <- WT_EKO_iced_for_norm$chr_1_EKO[is.na(WT_EKO_iced_for_norm$chr_1_WT)]
+WT_EKO_iced_for_norm$start_1_WT[is.na(WT_EKO_iced_for_norm$start_1_WT)] <- WT_EKO_iced_for_norm$start_1_EKO[is.na(WT_EKO_iced_for_norm$start_1_WT)]
+WT_EKO_iced_for_norm$end_1_WT[is.na(WT_EKO_iced_for_norm$end_1_WT)] <- WT_EKO_iced_for_norm$end_1_EKO[is.na(WT_EKO_iced_for_norm$end_1_WT)]
+WT_EKO_iced_for_norm$chr_2_WT[is.na(WT_EKO_iced_for_norm$chr_2_WT)] <- WT_EKO_iced_for_norm$chr_2_EKO[is.na(WT_EKO_iced_for_norm$chr_2_WT)]
+WT_EKO_iced_for_norm$start_2_WT[is.na(WT_EKO_iced_for_norm$start_2_WT)] <- WT_EKO_iced_for_norm$start_2_EKO[is.na(WT_EKO_iced_for_norm$start_2_WT)]
+WT_EKO_iced_for_norm$end_2_WT[is.na(WT_EKO_iced_for_norm$end_2_WT)] <- WT_EKO_iced_for_norm$end_2_EKO[is.na(WT_EKO_iced_for_norm$end_2_WT)]
+WT_EKO_iced_for_norm$WT_ice_score[is.na(WT_EKO_iced_for_norm$WT_ice_score)] <- 0
+
+WT_EKO_iced_for_norm$chr_1_EKO[is.na(WT_EKO_iced_for_norm$chr_1_EKO)] <- WT_EKO_iced_for_norm$chr_1_WT[is.na(WT_EKO_iced_for_norm$chr_1_EKO)]
+WT_EKO_iced_for_norm$start_1_EKO[is.na(WT_EKO_iced_for_norm$start_1_EKO)] <- WT_EKO_iced_for_norm$start_1_WT[is.na(WT_EKO_iced_for_norm$start_1_EKO)]
+WT_EKO_iced_for_norm$end_1_EKO[is.na(WT_EKO_iced_for_norm$end_1_EKO)] <- WT_EKO_iced_for_norm$end_1_WT[is.na(WT_EKO_iced_for_norm$end_1_EKO)]
+WT_EKO_iced_for_norm$chr_2_EKO[is.na(WT_EKO_iced_for_norm$chr_2_EKO)] <- WT_EKO_iced_for_norm$chr_2_WT[is.na(WT_EKO_iced_for_norm$chr_2_EKO)]
+WT_EKO_iced_for_norm$start_2_EKO[is.na(WT_EKO_iced_for_norm$start_2_EKO)] <- WT_EKO_iced_for_norm$start_2_WT[is.na(WT_EKO_iced_for_norm$start_2_EKO)]
+WT_EKO_iced_for_norm$end_2_EKO[is.na(WT_EKO_iced_for_norm$end_2_EKO)] <- WT_EKO_iced_for_norm$end_2_WT[is.na(WT_EKO_iced_for_norm$end_2_EKO)]
+WT_EKO_iced_for_norm$EKO_ice_score[is.na(WT_EKO_iced_for_norm$EKO_ice_score)] <- 0
+
+#Calculate correlation
+cor(WT_EKO_iced_for_norm$WT_ice_score,WT_EKO_iced_for_norm$EKO_ice_score) #0.4004866 Why so low? Because of the all = T in the merge? Try without: Gives 0.7999016
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r quantile_normalization, echo=FALSE}
+
+for_norm <- WT_EKO_iced_for_norm[,c(1,8,15)]
+x <- normalize.quantiles(as.matrix(for_norm[,2:3]))
+norm_bins <- cbind(for_norm[,1],as.data.frame(x))
+colnames(norm_bins) <- c("bin_key","WT_ice_score","EKO_ice_score")
+#WT_EKO_iced_norm if WT is overall higher where the is Ebf1 bindign
+WT_EKO_iced_norm <- cbind(WT_EKO_iced_for_norm[,c(2:7,1)],norm_bins[,c(2:3)])
+
+```
+
+```{r prep_for_sparseToDense_followed_by_BUTLR, echo=FALSE}
+
+FLWT_5000_iced$bin_key <- paste(FLWT_5000_iced$V1,FLWT_5000_iced$V2, sep = "_")
+FLWT_5000_iced_bin_key <-as.data.frame(FLWT_5000_iced[,c(1,2,4)])
+WT_EKO_iced_norm <- merge(FLWT_5000_iced_bin_key,WT_EKO_iced_norm[,c(7:9)], by = "bin_key", all.x = T)
+#This induces NAs but also changes the order so replace NAs with a small value (min from FLWT_5000 and FLEKO_5000, respectively, and reorder the column based on FLWT_5000_iced$bin_key)
+WT_EKO_iced_norm$WT_ice_score[is.na(WT_EKO_iced_norm$WT_ice_score)] <- min(FLWT_5000_iced$V3)
+WT_EKO_iced_norm$EKO_ice_score[is.na(WT_EKO_iced_norm$EKO_ice_score)] <- min(FLEKO_5000_iced$V3)
+WT_EKO_iced_norm <-WT_EKO_iced_norm[match(FLWT_5000_iced_bin_key$bin_key, WT_EKO_iced_norm$bin_key),]
+
+#The coordinates are in a scientific format which is annoying so turn them into a proper coordinate.
+WT_EKO_iced_norm$start_1_WT <- format(WT_EKO_iced_norm$start_1_WT, scientific = F)
+WT_EKO_iced_norm$end_1_WT <- format(WT_EKO_iced_norm$end_1_WT, scientific = F)
+WT_EKO_iced_norm$start_2_WT <- format(WT_EKO_iced_norm$start_2_WT, scientific = F)
+WT_EKO_iced_norm$end_2_WT <- format(WT_EKO_iced_norm$end_2_WT, scientific = F)
+
+# Export the df to be converted:
+write.table(WT_EKO_iced_norm[,c(2,3,4)], "WT_for_BUTR.matrix", sep = "\t", quote = F, row.names = F, col.names = F)
+write.table(WT_EKO_iced_norm[,c(2,3,5)], "EKO_for_BUTR.matrix", sep = "\t", quote = F, row.names = F, col.names = F)
+
+#Retry this but remove the rows with the minimum values:
+
+test <- subset(WT_EKO_iced_norm, WT_EKO_iced_norm$WT_ice_score > min(WT_EKO_iced_norm$WT_ice_score) | WT_EKO_iced_norm$EKO_ice_score > min(WT_EKO_iced_norm$EKO_ice_score))
+write.table(test[,c(2,3,4)], "WT_for_BUTR.matrix", sep = "\t", quote = F, row.names = F, col.names = F)
+write.table(test[,c(2,3,5)], "EKO_for_BUTR.matrix", sep = "\t", quote = F, row.names = F, col.names = F)
+
+
+#In bash: /mnt/data/bioinfo_tools_and_refs/bioinfo_tools/HiC-Pro_2.11.1/bin/utils/sparseToDense.py -b /mnt/data/common/jonas/placseq/191009_21_174_175_H3K4me3_PLAC_FLWT_hicpro/hic_results/matrix/21_174_175_fastq_trimmed/raw/5000/21_174_175_fastq_trimmed_5000_abs.bed WT_for_BUTR.matrix --perchr -o WT_for_BUTR.dense.matrix
+# /mnt/data/bioinfo_tools_and_refs/bioinfo_tools/HiC-Pro_2.11.1/bin/utils/sparseToDense.py -b /mnt/data/common/jonas/placseq/191009_13_16_176_177_H3K4me3_PLAC_FLEKO_hicpro/hic_results/matrix/13_16_176_177_fastq_trimmed/raw/5000/13_16_176_177_fastq_trimmed_5000_abs.bed EKO_for_BUTR.matrix --perchr -o EKO_for_BUTR.dense.matrix
+
+#These files will be converted to the sparse format, then to the BUTLR format so I can read  it into http://promoter.bx.psu.edu/hi-c/virtual4c.php
+#The conversion to BUTLR-format does not work but it does work for the raw HiC-Pro values. Can it not deal with decimals? WT_EKO_iced_norm ice norm-file. That works so them something is wrong with my matrix!!!! It converts nicely to a sparse.
+
+#perl /mnt/data/bioinfo_tools_and_refs/bioinfo_tools/BUTLRTools/matrixToButlr.pl -a mm10 -g /mnt/data/common/jonas/placseq/mm10_chrNameLength.txt -m /mnt/data/common/jonas/placseq/HiC-Pro-valid_interaction_files/quantile_norm_for_BUTR/WT_chrom_matrix_file -r 5000 -o FLWT_iced_quant.butlr
+
+#perl /mnt/data/bioinfo_tools_and_refs/bioinfo_tools/BUTLRTools/matrixToButlr.pl -a mm10 -g /mnt/data/common/jonas/placseq/mm10_chrNameLength.txt -m /mnt/data/common/jonas/placseq/HiC-Pro-valid_interaction_files/quantile_norm_for_BUTR/EKO_chrom_matrix_file -r 5000 -o FLEKO_iced_quant.butlr
+```
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r export_for_feature_overlap, echo=FALSE}
+#Export a matrix that will be used for overlap with peaks and other things:
+#First I will remove self-interacting regions from the df above.
+y <- as.data.frame( str_split_fixed(WT_EKO_iced_norm$bin_key, "_",2) )
+colnames(y) <- c("bin1","bin2")
+#These are factors that cannot be compared so convert them to characters.
+y$bin1 <- as.character(y$bin1)
+y$bin2 <- as.character(y$bin2)
+WT_EKO_iced_norm <- cbind(WT_EKO_iced_norm,y)
+WT_EKO_iced_norm_self_filtered <- WT_EKO_iced_norm[-which(y$bin1 == y$bin2),]
+
+write.table(WT_EKO_iced_norm, "WT_EKO_iced_norm_for_overlap.txt", sep = "\t", quote = F, row.names = F, col.names = F)
+
+```
+#This dataframe may contain white spaces so remove them with: "awk -F, '{gsub(/ /, "", $0); print} ' input.txt"
+#In bash this will with the help of awk be split into two bedpe with the extra score column (one for WT_score and one for EKO_score).
+#Overlap with Ebf1 peaks using:
+bash /home/jonas/Documents/NALM6_ChIP_peak_PLAC-data-analysis/scripts/2Dbed_overlap_Homer_annotated_peaks_v2.sh WT_EKO_iced_norm_WT_score.clean.bed Combined_230_238_a_Ebf1_M1_M44-top-set.mm10_annotated.txt "Ebf1"
+
+bash /home/jonas/Documents/NALM6_ChIP_peak_PLAC-data-analysis/scripts/2Dbed_overlap_Homer_annotated_peaks_v2.sh WT_EKO_iced_norm_EKO_score.clean.bed Combined_230_238_a_Ebf1_M1_M44-top-set.mm10_annotated.txt "Ebf1"
+
+#Read the output files into R.
+
+```{r export_for_feature_overlap, echo=FALSE}
+#Do this after all the bash processing
+#Ebf1_binding_vs_bin_score
+Ebf1_score_WT <- read.delim("WT_EKO_iced_norm_WT_score.clean.bed.Ebf1.peak_overlap.txt", stringsAsFactors = F)
+Ebf1_score_EKO <- read.delim("WT_EKO_iced_norm_EKO_score.clean.bed.Ebf1.peak_overlap.txt", stringsAsFactors = F)
+all_WT_score <- read.delim("WT_EKO_iced_norm_WT_score.bed.Ebf1.id.txt", stringsAsFactors = F, header = F)
+all_EKO_score <- read.delim("WT_EKO_iced_norm_EKO_score.clean.bed.Ebf1.id.txt", stringsAsFactors = F, header = F)
+
+Ebf1_score_WT <- Ebf1_score_WT[,c(1,9:10)]
+Ebf1_score_EKO <- Ebf1_score_EKO[,c(1,9:10)]
+
+peak_n_score <- as.data.frame( cbind(all_WT_score[,1],all_EKO_score[,1],all_WT_score[,8],all_EKO_score[,8]) )
+peak_n_score <- peak_n_score[,c(1,3,4)]
+colnames(peak_n_score) <- c("PeakID","WT_score","EKO_score")
+
+rm(all_WT_score)
+rm(all_EKO_score)
+
+peak_n_score <- merge(peak_n_score, Ebf1_score_WT, by = "PeakID", all.x = T)
+peak_n_score$isTF_left_anchor[is.na(peak_n_score$isTF_left_anchor)] <- 0
+peak_n_score$isTF_right_anchor[is.na(peak_n_score$isTF_right_anchor)] <- 0
+peak_n_score$Ebf1_peaks <- peak_n_score$isTF_left_anchor + peak_n_score$isTF_right_anchor
+#A score of 1 is binding in one ap and of 2 in both.
+
+peak_n_score <- peak_n_score[,c(1:3,6)]
+```
+
+```{r HiCcompare_normalization, echo=FALSE}
+#multiHiCcompare is only recommended when you have multiple replicates so the developers recommend HiCcompare
+library(multiHiCcompare)
+library(HiCcompare)
+library(preprocessCore)
+setwd("/mnt/data/common/jonas/placseq/HiC-Pro-valid_interaction_files/multiHiCcompare_norm")
+mat_WT <- read.table("/mnt/data/common/jonas/placseq/191009_21_174_175_H3K4me3_PLAC_FLWT_hicpro/hic_results/matrix/21_174_175_fastq_trimmed/raw/5000/21_174_175_fastq_trimmed_5000.matrix")
+bed_WT <- read.table("/mnt/data/common/jonas/placseq/191009_21_174_175_H3K4me3_PLAC_FLWT_hicpro/hic_results/matrix/21_174_175_fastq_trimmed/raw/5000/21_174_175_fastq_trimmed_5000_abs.bed")
+mat_EKO <- read.table("/mnt/data/common/jonas/placseq/191009_13_16_176_177_H3K4me3_PLAC_FLEKO_hicpro/hic_results/matrix/13_16_176_177_fastq_trimmed/raw/5000/13_16_176_177_fastq_trimmed_5000.matrix")
+bed_EKO <- read.table("/mnt/data/common/jonas/placseq/191009_13_16_176_177_H3K4me3_PLAC_FLEKO_hicpro/hic_results/matrix/13_16_176_177_fastq_trimmed/raw/5000/13_16_176_177_fastq_trimmed_5000_abs.bed")
+
+dat_WT <- HiCcompare::hicpro2bedpe(mat_WT, bed_WT)
+dat_EKO <- HiCcompare::hicpro2bedpe(mat_EKO, bed_EKO)
+#Bring out the cis interactions only
+dat_WT <- dat_WT$cis
+dat_EKO <- dat_EKO$cis
+
+#If I want to use multiHiC-compare I have to pick dat_WT$cis and EKO$cis part chromosome by chromosome and then put these together into a df that I then rbind to one large object and feed into make_hicexp()
+hic.list <- mapply(create.hic.table, dat_WT, dat_EKO, SIMPLIFY = FALSE, scale = FALSE)
+hic.list <- total_sum(hic.list)
+hic.list <- hic_loess(hic.list, parallel = TRUE)
+# Merge the lists to a df
+hic.list <- do.call(rbind, hic.list)
+cor(hic.list$adj.IF1,hic.list$adj.IF2) # 0.6986924
+
+hic_list4virt4c <- hic.list[,c(1:6,11,12)]
+
+#Now hic.lists should be prepared for virtual 4c analysis as above
+#I now have a df with adjusted IFs.
+#Pull out the coordinates and adjusted IF, match it to the bin_keys and sort in original order.
+hic_list4virt4c$bin1 <- paste(hic_list4virt4c$chr1,hic_list4virt4c$start1,hic_list4virt4c$end1,sep = "_")
+hic_list4virt4c$bin2 <- paste(hic_list4virt4c$chr2,hic_list4virt4c$start2,hic_list4virt4c$end2,sep = "_")
+#Replace the bins with the bin_keys:
+gc_trans_key <- bed_WT
+gc_trans_key$bin_key <- paste(gc_trans_key$V1, gc_trans_key$V2, gc_trans_key$V3, sep = "_")
+
+#Replace the coordinates with the bin_key.
+hic_list4virt4c$bin1 <- gc_trans_key$V4[match(hic_list4virt4c$bin1, gc_trans_key$bin_key)]
+hic_list4virt4c$bin2 <- gc_trans_key$V4[match(hic_list4virt4c$bin2, gc_trans_key$bin_key)]
+ 
+hic_list4virt4c <- hic_list4virt4c[,c(9,10,7,8)]
+#Can I make a virtual 4c file from this or do I need to create the original length with zeros.
+#Try with the wt first:
+#It did work but unlike the the quantile norm from the ice norm above the base line between the wt and eko is different. Try a quant norm on this data and fo again:
+x <- normalize.quantiles(as.matrix(hic_list4virt4c[,3:4]))
+hic_list4virt4c <- cbind(hic_list4virt4c, as.data.frame(x))
+#Changes correlation to 0.90.
+
+
+
+write.table(hic_list4virt4c[,c(1,2,5)], "WT_hiccompare_norm_for_BUTR.matrix", sep = "\t", quote = F, row.names = F, col.names = F)
+
+write.table(hic_list4virt4c[,c(1,2,6)], "EKO_hiccompare_norm_for_BUTR.matrix", sep = "\t", quote = F, row.names = F, col.names = F)
+#In bash: /mnt/data/bioinfo_tools_and_refs/bioinfo_tools/HiC-Pro_2.11.1/bin/utils/sparseToDense.py -b /mnt/data/common/jonas/placseq/191009_21_174_175_H3K4me3_PLAC_FLWT_hicpro/hic_results/matrix/21_174_175_fastq_trimmed/raw/5000/21_174_175_fastq_trimmed_5000_abs.bed WT_hiccompare_norm_for_BUTR.matrix --perchr
+#perl /mnt/data/bioinfo_tools_and_refs/bioinfo_tools/BUTLRTools/matrixToButlr.pl -a mm10 -g /mnt/data/common/jonas/placseq/mm10_chrNameLength.txt -m /mnt/data/common/jonas/placseq/HiC-Pro-valid_interaction_files/multiHiCcompare_norm/WT_chrom_matrix_file_hicnorm -r 5000 -o WT_chrom_matrix_file_hicnorm.butlr
+
+#/mnt/data/bioinfo_tools_and_refs/bioinfo_tools/HiC-Pro_2.11.1/bin/utils/sparseToDense.py -b /mnt/data/common/jonas/placseq/191009_13_16_176_177_H3K4me3_PLAC_FLEKO_hicpro/hic_results/matrix/13_16_176_177_fastq_trimmed/raw/5000/13_16_176_177_fastq_trimmed_5000_abs.bed EKO_hiccompare_norm_for_BUTR.matrix --perchr
+#perl /mnt/data/bioinfo_tools_and_refs/bioinfo_tools/BUTLRTools/matrixToButlr.pl -a mm10 -g /mnt/data/common/jonas/placseq/mm10_chrNameLength.txt -m /mnt/data/common/jonas/placseq/HiC-Pro-valid_interaction_files/multiHiCcompare_norm/EKO_chrom_matrix_file_hicnorm -r 5000 -o EKO_chrom_matrix_file_hicnorm.butlr
+save.image("multiHiC_compare_norm.RData")
+
+#Plot the densities to see that the lines do not overlap.
+plot(density(hic_list4virt4c$adj.IF1), xlim=c(0,20))
+lines(density(hic_list4virt4c$adj.IF1), col=c("red"))
+
+#It looks to me that HiCcompare does a better job than my own normalization from the iced data. Carry on with this analysis.
+#For statistical analysis I assume I will have to filter out self-interacting bins.
+
+#Diff compare
+hic.list2 <- hic_compare(hic.list, A.min = 1, adjust.dist = TRUE, p.method = 'fdr', Plot = FALSE)
+hic.list2 <- do.call(rbind, hic.list2)
+hic.list2 <- hic.list2[hic.list2$p.adj<0.05,]
+
+```
+
+```{r man_virt4c, echo=FALSE}
+install.packages("DescTools")
+library(DescTools)
+library(pheatmap)
+library(RColorBrewer)
+#How can I compare the signal over different regions? The way I see it we can take two different approaches. 1) We calculate total signal (maybe AUC) between WT and EKO for a given promoter and everything that connects to it. 2) One specify a set of bins and calculate the signal there. I will try to functionalize this but first I must write the code.
+
+#Figure out what bin each promoter is in and assign it a key.
+#Bring out mm10 tss: annotatePeaks.pl tss mm10 > mm10_tss.txt. Can I use bedtools to merge this with the bin bed file
+# pos2bed mm10_tss.txt > mm10_tss.bed # bedtools intersect -wa -a 21_174_175_fastq_trimmed_5000_abs.bed -b mm10_tss_size0.bed > bins_5000_with_promoters.bed  #bedtools intersect -wb -a 21_174_175_fastq_trimmed_5000_abs.bed -b mm10_tss_size0.bed > promoters_in_bins_5000.bed
+
+#########################################################################################################################
+###################################       PREPROCESSING STARTS       #################################################### 
+#########################################################################################################################
+bins_5000_with_promoters <-read.delim("multiHiCcompare_norm/bins_5000_with_promoters.bed", header = F, stringsAsFactors = F)
+promoters_in_bins_5000 <- read.delim("multiHiCcompare_norm/promoters_in_bins_5000.bed", header = F, stringsAsFactors = F)
+
+#From promoters_in_bins bring out key and corresponding key. Looks like they are sorted in the same order
+promoters_in_bins_5000 <- promoters_in_bins_5000[,c(4,8)]
+bins_5000_with_promoters <- merge(bins_5000_with_promoters, promoters_in_bins_5000, by = "V4", all.x = T)
+#Several promoters cam be in one bin so
+bins_5000_with_promoters$unique_entries <- paste(bins_5000_with_promoters$V4,bins_5000_with_promoters$V8, sep = "_")
+bins_5000_with_promoters <- bins_5000_with_promoters[!duplicated(bins_5000_with_promoters$unique_entries),]
+bins_5000_with_promoters <- bins_5000_with_promoters[,-6]
+#Now bring in more annotations to this list:
+mm10_tss <- read.delim("multiHiCcompare_norm/mm10_tss_size0.txt", stringsAsFactors = F)
+colnames(mm10_tss)[1]<- "PeakID"
+mm10_tss <- mm10_tss[,c(1,12,14:16)]
+
+promoter_bin_key <- merge(bins_5000_with_promoters, mm10_tss, by.x = "V8", by.y = "PeakID", all.x = T)
+colnames(promoter_bin_key)[1:5] <- c("PromoterID","bin_key", "chr", "start", "end") 
+#Reorder after bin_key
+promoter_bin_key <- promoter_bin_key[order(promoter_bin_key$bin_key),]
+
+colnames(hic_list4virt4c)[5:6]<-c("quant.IF1","quant.IF2")
+# Filter out lines that has the same bins interacting.
+hic_list4virt4c_no_same <- hic_list4virt4c[-which(hic_list4virt4c$bin1 == hic_list4virt4c$bin2),]
+
+#########################################################################################################################
+###################################       PREPROCESSING ENDS      #################################################### 
+#########################################################################################################################
+#I should be able to use this key to match a gene to the total score that is connected to one bin.
+#try an exampel with Pax5
+
+genebinIntScore <- function(df = hic_list4virt4c_no_same, gene_name){
+  library(DescTools)
+  #Create a list that of all the Pax5 connected bins that I can later loop over
+  bin_key <- lapply(unique(promoter_bin_key[ which(promoter_bin_key$Gene.Name == gene_name), ]$bin_key) , as.data.frame )  
+
+  #Create the AUC for all the bins connecting to bin_key[[i]
+  mat <- matrix(, nrow = length(bin_key), ncol = 2)
+  name_vector <- vector(length = length(bin_key) )
+  #Loop over all the bins:
+  for (i in 1:length(bin_key)) {
+    bin_nr <- as.numeric( bin_key[[i]] )
+    print(bin_nr)
+    #Take out the rows matching these bins from hic_list4virt4c_no_same
+    int_bins <- subset(hic_list4virt4c_no_same, hic_list4virt4c_no_same$bin1 == bin_nr | hic_list4virt4c_no_same$bin2 == bin_nr)
+    #Add a counter if ot doesn't exist.:
+    if (!"counter" %in% colnames(int_bins)){
+    int_bins$counter <- seq(1,length(int_bins[,1]))
+    }
+
+    mat[i,1] <- as.numeric( AUC(x = as.vector(int_bins$quant.IF1), y = as.vector(int_bins$counter)) )
+    mat[i,2] <- as.numeric( AUC(x = as.vector(int_bins$quant.IF2), y = as.vector(int_bins$counter)) )
+    name_vector[i]  <- paste(gene_name, bin_nr, sep = "_")
+ 
+    #Loop ends here
+    print(i)
+  }
+results_AUC <- as.data.frame(mat)
+colnames(results_AUC) <- c("AUC_FLWT","AUC_FLEKO")
+rownames(results_AUC) <- name_vector
+return(results_AUC)
+
+}
+
+genes_test <- c("Gata3", "Ebf1", "Pax5","Hprt","Notch1","Cd79b","Igll1","Cd19","Tcf7", "Actb","Gapdh", "Flt3","Cd5", "Bcl11b", "Runx1", "Ikzf1", "Ikzf2", "Ikzf3", "Myc")
+
+#Match this in to
+idToGene <- promoter_bin_key[,c(6,9)]
+
+#Real data!!!! Exciting!
+genes_w_WT_and_EKO_acc_ATAC <- read.delim("multiHiCcompare_norm/gene_list_analysis/Genes_w_WT_and_EKO_acc_ATAC.csv", stringsAsFactors = F)
+colnames(genes_w_WT_and_EKO_acc_ATAC)[1] <- "Entrez.ID"
+genes_w_WT_and_EKO_acc_ATAC <- merge(genes_w_WT_and_EKO_acc_ATAC,idToGene, by = "Entrez.ID", all.x = T)
+genes_w_WT_and_EKO_acc_ATAC <- genes_w_WT_and_EKO_acc_ATAC[!duplicated(genes_w_WT_and_EKO_acc_ATAC$Gene.Name),]
+
+genes_w_WT_only_acc_ATAC <- read.delim("multiHiCcompare_norm/gene_list_analysis/Genes_w_WT_only_acc_ATAC.csv", stringsAsFactors = F)
+colnames(genes_w_WT_only_acc_ATAC)[1] <- "Entrez.ID"
+genes_w_WT_only_acc_ATAC <- merge(genes_w_WT_only_acc_ATAC,idToGene, by = "Entrez.ID", all.x = T)
+genes_w_WT_only_acc_ATAC <- genes_w_WT_only_acc_ATAC[!duplicated(genes_w_WT_only_acc_ATAC$Gene.Name),]
+
+atac_access_mixed <- read.delim("multiHiCcompare_norm/gene_list_analysis/Genes_w_WT_and_EKO_acc_ATAC_Genes_w_WT_only_acc_ATAC.csv", stringsAsFactors = F)
+colnames(atac_access_mixed)[1] <- "Entrez.ID"
+atac_access_mixed <- merge(atac_access_mixed,idToGene, by = "Entrez.ID", all.x = T)
+atac_access_mixed <- atac_access_mixed[!duplicated(atac_access_mixed$Gene.Name),]
+
+
+#Turn to vectors_
+genes_w_WT_and_EKO_acc_ATAC_vector <- as.vector(genes_w_WT_and_EKO_acc_ATAC['Gene.Name'])
+genes_w_WT_only_acc_ATAC_vector <- as.vector(genes_w_WT_only_acc_ATAC['Gene.Name'])
+atac_access_mixed_vector <- as.vector(atac_access_mixed['Gene.Name'])
+
+#Turn the dfs and vectors above to a list for a cleaner workspace.
+atac_gen_cat_list <- list(genes_w_WT_and_EKO_acc_ATAC = genes_w_WT_and_EKO_acc_ATAC, genes_w_WT_only_acc_ATAC = genes_w_WT_only_acc_ATAC, atac_access_mixed = atac_access_mixed, genes_w_WT_and_EKO_acc_ATAC_vector = genes_w_WT_and_EKO_acc_ATAC_vector, genes_w_WT_only_acc_ATAC_vector = genes_w_WT_only_acc_ATAC_vector, atac_access_mixed_vector = atac_access_mixed_vector)
+
+genes <- j
+#Create a loop over a vector and put the results in each entry
+gene_virt4c_score <- vector(mode = "list", length = 0)
+for (j in genes_test) {
+  print(j)
+  gene_virt4c_score[[j]] <- genebinIntScore(df = hic_list4virt4c, gene_name = j)
+}
+
+df <- do.call(rbind, lapply(gene_virt4c_score, data.frame, stringsAsFactors=FALSE))
+df$WT <- df$AUC_FLWT/df$AUC_FLWT
+df$EKO <- df$AUC_FLEKO/df$AUC_FLWT
+
+#Plot the test genes:
+breakList <- seq(-2, 2, by = 0.1)
+pheatmap(mat = log2(df[,c(3,4)]), cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE,  scale = "none" ,  color = colorRampPalette(rev(brewer.pal(n = 11, name = "RdYlBu")))(length(breakList)), breaks = breakList  )
+
+df_genes_atac_access_mixed_vector <- df
+
+#Give each df a unique cat variable.
+df_genes_atac_access_mixed_vector$category <-"df_genes_atac_access_mixed"
+df_genes_w_WT_and_EKO_acc_ATAC_vector$category  <- "df_genes_w_WT_and_EKO_acc_ATAC"
+df_genes_w_WT_only_acc_ATAC$category <- "df_genes_w_WT_only_acc_ATAC"
+
+#Order each list on EKO value and rbind them.
+df_genes_atac_access_mixed_vector <- df_genes_atac_access_mixed_vector[order(df_genes_atac_access_mixed_vector$EKO),]
+df_genes_w_WT_and_EKO_acc_ATAC_vector <- df_genes_w_WT_and_EKO_acc_ATAC_vector[order(df_genes_w_WT_and_EKO_acc_ATAC_vector$EKO),]
+df_genes_w_WT_only_acc_ATAC <- df_genes_w_WT_only_acc_ATAC[order(df_genes_w_WT_only_acc_ATAC$EKO),]
+
+df_genes_atac_cats <- rbind(df_genes_w_WT_only_acc_ATAC, df_genes_atac_access_mixed_vector,df_genes_w_WT_and_EKO_acc_ATAC_vector)
+
+breakList <- seq(-3, 3, by = 0.1)
+ann_cols <-as.data.frame(df_genes_atac_cats[,c(5,5)])
+ann_cols$category <- as.factor(ann_cols$category)
+ann_cols$category.1 <- as.factor(ann_cols$category.1)
+
+rownames(ann_cols)<-rownames(df_genes_atac_cats)
+
+pheatmap(mat = log2(df_genes_atac_cats[,c(4,4)]), cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE,  scale = "none" ,  color = colorRampPalette(rev(brewer.pal(n = 11, name = "RdYlBu")))(length(breakList)), breaks = breakList , annotation_row = ann_cols[,c(1,1)] )
+
+#Ok, now we have the heatmap. Split this in up and down in EKO and make two box_plots-
+df_genes_atac_cats_up_EKO <- subset(df_genes_atac_cats,df_genes_atac_cats$EKO > 1)
+df_genes_atac_cats_down_EKO <- subset(df_genes_atac_cats,df_genes_atac_cats$EKO < 1)
+
+df_genes_atac_cats_up_EKO <- df_genes_atac_cats_up_EKO[,c(1,2,5)]
+df_genes_atac_cats_down_EKO <- df_genes_atac_cats_down_EKO[,c(1,2,5)]
+
+df_genes_atac_cats_up_EKO <- melt(data = df_genes_atac_cats_up_EKO, id.vars = c("category"), measure.vars = c("AUC_FLWT","AUC_FLEKO") )
+df_genes_atac_cats_up_EKO$category <- factor(df_genes_atac_cats_up_EKO$category, levels = c("df_genes_w_WT_only_acc_ATAC", "df_genes_atac_access_mixed", "df_genes_w_WT_and_EKO_acc_ATAC"), )
+
+ggplot() + geom_violin(data = df_genes_atac_cats_up_EKO,aes(x = category, y = log2(value), fill = variable),  draw_quantiles = c(0.25, 0.5, 0.75), scale = "count" ) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme_bw()
+ggsave("genes_atac_cats_up_EKO.pdf",device = "pdf", dpi = 300,width = 10, height = 8, units = c("cm"))
+
+df_genes_atac_cats_down_EKO <- melt(data = df_genes_atac_cats_down_EKO, id.vars = c("category"), measure.vars = c("AUC_FLWT","AUC_FLEKO") )
+df_genes_atac_cats_down_EKO$category <- factor(df_genes_atac_cats_down_EKO$category, levels = c("df_genes_w_WT_only_acc_ATAC", "df_genes_atac_access_mixed", "df_genes_w_WT_and_EKO_acc_ATAC"))
+
+ggplot() + geom_violin(data = df_genes_atac_cats_down_EKO,aes(x = category, y = log2(value), fill = variable),  draw_quantiles = c(0.25, 0.5, 0.75), scale = "count" ) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme_bw()
+ggsave("genes_atac_cats_down_EKO.pdf",device = "pdf", dpi = 300,width = 10, height = 8, units = c("cm"))
+
+#Statistical calulation on the groups in the plot
+#Up_eko
+
+wilcox.test(value ~variable, data = subset(df_genes_atac_cats_up_EKO, df_genes_atac_cats_up_EKO$category == "df_genes_w_WT_only_acc_ATAC")) # p=0.36
+wilcox.test(value ~variable, data = subset(df_genes_atac_cats_up_EKO, df_genes_atac_cats_up_EKO$category == "df_genes_atac_access_mixed")) # p=0.34
+wilcox.test(value ~variable, data = subset(df_genes_atac_cats_up_EKO, df_genes_atac_cats_up_EKO$category == "df_genes_w_WT_and_EKO_acc_ATAC")) # p=0.05
+
+
+wilcox.test(value ~variable, data = subset(df_genes_atac_cats_down_EKO, df_genes_atac_cats_down_EKO$category == "df_genes_w_WT_only_acc_ATAC")) # p=0.02
+wilcox.test(value ~variable, data = subset(df_genes_atac_cats_down_EKO, df_genes_atac_cats_down_EKO$category == "df_genes_atac_access_mixed")) # p=4.928e-12
+wilcox.test(value ~variable, data = subset(df_genes_atac_cats_down_EKO, df_genes_atac_cats_down_EKO$category == "df_genes_w_WT_and_EKO_acc_ATAC")) # p=0.34
+
+
+```
+
+```{r bin_score_calculation_per_overlapping_bins, echo=FALSE}
+source("/home/jonas/R_scripts/match_list_function.R")
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+# Using bedtools intersect with the bin_key list and a peak-file, determine in what bin a peak exists. Use the 230238 Ebf1-peak list.
+# pos2bed.pl Combined_230_238_a_Ebf1_M1_M44-top-set.mm10_annotated.txt > Combined_230_238_a_Ebf1_M1_M44-top-set.mm10_annotated.bed. # bedtools intersect -wa -a 21_174_175_fastq_trimmed_5000_abs.bed -b Combined_230_238_a_Ebf1_M1_M44-top-set.mm10_annotated.bed > bins_with_Ebf1_peaks.bed #bedtools intersect -wb -a 21_174_175_fastq_trimmed_5000_abs.bed -b Combined_230_238_a_Ebf1_M1_M44-top-set.mm10_annotated.bed > Ebf1_coordinates_in_bins.bed
+
+bins_with_Ebf1_peaks <- read.delim("multiHiCcompare_norm/bins_with_Ebf1_peaks.bed", stringsAsFactors = F, header = F)
+Ebf1_coordinates_in_bins <- read.delim("multiHiCcompare_norm/Ebf1_coordinates_in_bins.bed", stringsAsFactors = F, header = F)
+bins_with_Ebf1_peaks <- cbind(bins_with_Ebf1_peaks, Ebf1_coordinates_in_bins[,8])
+colnames(bins_with_Ebf1_peaks)[5]<-"PeakID"
+
+#Can I use my match_list function?
+bins_with_score <- hic_list4virt4c_no_same
+#With my match_list function, deduce which interactions that have Ebf1 in one or two bins.
+bins_with_score <- match_lists(bins_with_score, bins_with_score$bin1, bins_with_Ebf1_peaks$V4, 1, name_match_column = "bin1_Ebf1_bound")
+bins_with_score <- match_lists(bins_with_score, bins_with_score$bin2, bins_with_Ebf1_peaks$V4, 1, name_match_column = "bin2_Ebf1_bound")
+bins_with_score$Ebf1_bin_status <- bins_with_score$bin1_Ebf1_bound + bins_with_score$bin2_Ebf1_bound 
+table(bins_with_score$Ebf1_bin_status)
+
+bins_with_score %>% group_by(Ebf1_bin_status) %>% summarise(average=mean(quant.IF1))
+bins_with_score %>% group_by(Ebf1_bin_status) %>% summarise(average=mean(quant.IF2))
+
+#Plot on the spot:
+test <- bins_with_score
+test$bin_key <- paste(test$bin1,test$bin2, sep = "_")      
+test <- test[,c(9,5,6)]
+test <- melt(data = test, id.vars = c("Ebf1_bin_status"), measure.vars = c("quant.IF1","quant.IF2") )
+test$Ebf1_bin_status <- as.factor(as.character(test$Ebf1_bin_status))
+ggplot(data = test) + geom_boxplot(aes(x = Ebf1_bin_status, y = log10(value), fill = variable))
+
+
+```
+
+```{r HiCcompare_normalization_res_bin_size_data, echo=FALSE}
+#multiHiCcompare is only recommended when you have multiple replicates so the developers recommend HiCcompare
+library(multiHiCcompare)
+library(HiCcompare)
+library(preprocessCore)
+
+#Turns out that I cannot do this. Data too sparse (too many 1s)
+
+```
+

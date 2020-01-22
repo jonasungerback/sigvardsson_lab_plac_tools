@@ -1,0 +1,167 @@
+#==================================== 
+# Sample configuration file 
+# for running the FitHiChIP + HiCPro 
+# Sample values of these parameters are also specified 
+#====================================  
+
+
+#==================================== 
+# Paired reads / matrix specification 
+# according to the HiC-Pro pipeline specification 
+# user can either specify the parameter 1 
+# or the parameters 2 and 3 (jointly) 
+# if all three parameters are specified, computation begins by using the parameters 2 and 3 
+#====================================== 
+
+# Parameter 1 
+# File containing the valid pairs from HiCPro pipeline 
+# Can be either a text file, or a gzipped text file 
+ValidPairs=/mnt/data/common/jonas/placseq/HiC-Pro-valid_interaction_files/H3K4me3_PLAC_230238_trimmed_allValidPairs.txt.gz
+
+# Parameter 2
+# File containing the bin intervals (according to a specified bin size)
+# which is an output of HiC-pro pipeline
+# If not provided, this is computed from the parameter 1
+Interval=
+
+# Parameter 3
+# File storing the contact matrix (output of HiC-pro pipeline)
+# should be accompanied with the parameter 2
+# if not specified, computed from the parameter 1
+Matrix=
+
+# Parameter 4
+# Peak detection output file
+# mandatory parameter
+PeakFile=/mnt/data/common/jonas/chipseq/merged_chip_tagdirs/ChIP168_169_230238_H3K4me3_rep1_2/ChIP168_169_230238_H3K4me3_rep1_2.bed
+
+# Parameter 5
+# Output base directory under which all results will be stored
+OutDir=/mnt/data/common/jonas/placseq/H3K4me3_PLAC_230238/H3K4me3_PLAC_230238_FitHiChIP
+
+#Parameter 6
+#Base directory of HiC-pro package.
+#mandatory parameter
+# Required to run the utility functions of HiC-pro
+HiCProBasedir=/mnt/data/bioinfo_tools_and_refs/bioinfo_tools/HiC-Pro_2.9.0/HiC-Pro-2.9.0/
+
+#======================================
+# Parameters related to genomic features
+#======================================
+
+# Absolute path of the file containing the information of reference chromosome size
+ChrSizeFile=/mnt/data/common/jonas/placseq/mm10_chrNameLength.txt
+
+# fasta file of the reference genome
+# used to compute the GC content information
+# Note: now the parameter is optional (default: blank)
+RefFasta=
+
+# Absolute path of the Reference mappability file (according to the reference genome)
+# (may be downloaded from the site  http://hgdownload.cse.ucsc.edu/goldenPath/)
+# should be provided in the bedgraph format
+# If user has bigWig file, the following UCSC utility
+# is to be used for conversion to bedGraph format
+# BigWigToBedgraph inp.bw out.bedGraph
+# Note: now the parameter is optional (default: blank)
+MappabilityFile=
+
+# restriction fragment file
+# of the format:        chr     interval_start  interval_end
+# Note: now the parameter is optional (default: blank)
+REFragFile=/mnt/data/bioinfo_tools_and_refs/bioinfo_tools/HiC-Pro_2.9.0/HiC-Pro-2.9.0/annotation/mm10_mboI_reg_chr.bed
+
+# size of the window upstream and downstream the restriction site used
+# to calculate the GC content(default 200)
+GCSize=200
+
+# size of the window upstream and downstream the restriction site
+# used to calculate the mappability
+MappSize=500
+
+#======================================
+# Numerical parameters regarding the execution of FitHiChIP
+#======================================
+
+#Interaction type
+#1: peak to peak
+#2: peak to non peak
+#3: peak to all (default)
+#4: all to all
+#5: everything from 1 to 4.
+IntType=3
+
+# Size of the bins [default = 5000], in bases, for detecting the interactions.
+BINSIZE=5000
+
+# Lower distance threshold of interaction between two segments
+# (default = 20000 or 20 Kb)
+LowDistThr=10000
+
+# Upper distance threshold of interaction between two segments
+# (default = 2000000 or 2 Mb)
+UppDistThr=3000000
+
+# Minimum FDR (q-value) cutoff for significant interaction detection
+QVALUE=0.05
+
+#======================================
+# Parameters specific to the spline fit
+#======================================
+
+# In the FitHiC model, this is the max no of equal occupancy bins (Default 200)
+NBins=200
+
+# In the FitHiC model, for peak to all interactions,
+# setting this parameter to 1 means that peak to peak background will be used.
+# Else (value = 0) all the interactions of peak to all category will be used for background estimation.
+# ******* Use 1 if you require very stringent output (only very highly significant interactions would be reported)
+# ******* Use 0 if you allow less stringency (higher number of interactions would be reported)
+UseP2PBackgrnd=0
+
+#======================================
+# Parameters regarding bias correction
+#======================================
+
+# Indicates if the bias correction is enabled (1) or not (0). Default 1 (recommended)
+BiasCorrection=1
+
+# parameter signifying the type of bias vector
+# can be 1 or 2
+# if 1, coverage specific bias is used
+# if 2, ICE specific bias is computed
+# default 1
+BiasType=1
+
+#======================================
+# Merging nearby significant contacts generated
+#======================================
+
+# the following parameter, if 1, means that interactions close to each other 
+# (due to their originating bins are closer) are merged
+# to represent a single interaction
+# if 0, no merging step is performed
+# Note: Currently this feature is under development - so recommended 0 for the moment
+# default: 0
+MergeInt=1
+
+#==============================
+# Few other parameters related to its execution
+#==============================
+
+#prefix string of the output files (Default = 'FitHiChIP').
+PREFIX=230238_H3K4me3_FitHiChIP
+
+# Specified as 1 or 0. If 1, draws the figures of various
+# statistics / analysis. Default 0.
+Draw=1
+
+# Specified as 1 or 0. If 1, performs time profiling of the complete steps. Defalt 0.
+TimeProf=1
+
+# specified as 1 or 0
+# if 1, overwrites the existing output files
+# if 0, does not overwrite the existing output files
+# default 0
+OverWrite=0
+
